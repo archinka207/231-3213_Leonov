@@ -1,0 +1,66 @@
+version: '3.8' # Рекомендую добавить версию файла для лучшей совместимости
+
+services:
+  db:
+    image: postgres:15 # Вы можете выбрать другую версию PostgreSQL, если нужно
+    container_name: lab1_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres       # Должно совпадать с application.yaml
+      POSTGRES_PASSWORD: 2288     # Должно совпадать с application.yaml
+      POSTGRES_DB: loaded_men     # Должно совпадать с application.yaml
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Сохранение данных БД
+    healthcheck:
+      # ИСПРАВЛЕНО ЗДЕСЬ: dbname теперь loaded_men
+      test: ["CMD-SHELL", "PGPASSWORD=2288 pg_isready --username=postgres --dbname=loaded_men"]
+      # Также рекомендую увеличить интервалы для healthcheck
+      interval: 10s # Например, 10 секунд
+      timeout: 5s   # Например, 5 секунд
+      retries: 5    # Например, 5 попыток
+    networks:
+      - dev
+    ports:
+      - "5433:5432" # Опционально: для подключения к БД с хоста через порт 5433 (pgAdmin и т.д.)
+
+  backend:
+    build:
+      context: ./backend # Путь к папке с Dockerfile вашего приложения
+      dockerfile: Dockerfile
+    container_name: lab1_spring_app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy # Запускать после того, как сервис db будет готов (не гарантирует полную готовность БД)
+    ports:
+      - "8081:8081" # Опционально: для прямого доступа к приложению на порту 8081 с хоста (для отладки)
+    environment:
+      # Переопределяем URL для подключения к БД, 'db' - имя сервиса PostgreSQL в этом docker-compose
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/loaded_men
+      SPRING_DATASOURCE_USERNAME: postgres # Можно не указывать, если совпадает с application.yaml
+      SPRING_DATASOURCE_PASSWORD: 2288   # Можно не указывать, если совпадает с application.yaml
+      # SERVER_PORT: 8081 # Уже указано в application.yaml, но можно и здесь для ясности
+    # Если вашему приложению нужны другие переменные окружения, добавьте их сюда
+    networks:
+      - dev
+
+  nginx:
+    image: nginx:latest
+    container_name: lab1_nginx_proxy
+    restart: always
+    ports:
+      - "80:80" # Маппим порт 80 хоста на порт 80 контейнера Nginx
+    volumes:
+      # Копируем наш шаблон конфигурации Nginx в место, где Nginx его ожидает.
+      # Официальный образ nginx обработает .template файлы в этой директории.
+      - ./nginx/templates:/etc/nginx/templates
+    depends_on:
+      - backend # Nginx должен запускаться после backend
+    networks:
+      - dev
+
+networks:
+  dev:
+
+volumes:
+  postgres_data: # Docker сам создаст этот volume для хранения данных PostgreSQL

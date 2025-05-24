@@ -1,0 +1,14 @@
+spring:
+    application:
+        name: lab1
+    datasource:
+        url: jdbc:postgresql://db:5432/loaded_men # <--- ИЗМЕНЕНО С localhost НА db
+        username: postgres
+        password: 2288 # Лучше выносить в переменные окружения
+        driver-class-name: org.postgresql.Driver
+    jpa:
+        hibernate:
+            ddl-auto: update
+        show-sql: true
+server:
+    port: 8081
